@@ -1,3 +1,14 @@
+# self ignored files
+.idea/
+data/
+config.py
+/trained_model/
+log/
+yacctab.py
+lextab.py
+.exe
+/tmp/*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
