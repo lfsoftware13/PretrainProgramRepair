@@ -1,4 +1,9 @@
-from config import train_ids_path, valid_ids_path, test_ids_path
+from config import train_ids_path, valid_ids_path, test_ids_path, deepfix_masked_position_path
+
+
+def read_deepfix_masked_position():
+    position_dict = read_data_ids_from_file(deepfix_masked_position_path)
+    return position_dict
 
 
 def read_training_data_ids():
