@@ -103,6 +103,13 @@ def create_deepfix_common_error_vocabulary(begin_tokens, end_tokens, unk_token, 
     return vocab
 
 
+def load_deepfix_common_error_vocabulary():
+    vocab = create_deepfix_common_error_vocabulary(begin_tokens=['<BEGIN>', '<INNER_BEGIN>'],
+                                                   end_tokens=['<END>', '<INNER_END>'], unk_token='<UNK>',
+                                                   addition_tokens=['<PAD>', '<MASK>'])
+    return vocab
+
+
 if __name__ == '__main__':
     # res = get_common_error_vocabulary_set()
     # print(type(res), len(res))
@@ -110,7 +117,7 @@ if __name__ == '__main__':
     # print(type(res), len(res))
     vocab = create_deepfix_common_error_vocabulary(begin_tokens=['<BEGIN>', '<INNER_BEGIN>'],
                                                    end_tokens=['<END>', '<INNER_END>'], unk_token='<UNK>',
-                                                   addition_tokens=['<PAD>'])
+                                                   addition_tokens=['<PAD>', '<MASK>'])
 
     keyword_ids = create_effect_keyword_ids_set(vocab)
     true_keywords = pre_defined_c_tokens

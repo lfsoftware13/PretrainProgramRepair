@@ -9,7 +9,7 @@ from common.constants import pre_defined_c_tokens, pre_defined_c_tokens_map, pre
 from common.logger import info
 from common.pycparser_util import transform_LexToken_list, transform_LexToken, tokenize_by_clex_fn
 from common.util import create_token_mask_by_token_set, disk_cache, generate_mask, OrderedList
-from read_data.load_data_vocabulary import create_common_error_vocabulary
+from experiment.load_data_vocabulary import create_common_error_vocabulary
 
 
 class TransformVocabularyAndSLK(object):

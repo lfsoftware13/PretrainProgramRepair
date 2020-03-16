@@ -1065,6 +1065,43 @@ def calculate_action_bias_from_iterative_to_static(action_list):
     return bias_list
 
 
+# ---------------------------- parse mask position ----------------------------------- #
+def parse_masked_code(df, vocab, tokenize_fn):
+    df['res'] = ''
+
+    df['ac_code_obj'] = df['ac_code'].map(tokenize_fn)
+    df = df[df['ac_code_obj'].map(lambda x: x is not None)].copy()
+    df['ac_code_obj'] = df['ac_code_obj'].map(list)
+    print('after tokenize: ', len(df.index))
+    df['ac_code_name'] = df['ac_code_obj'].map(create_name_list_by_LexToken)
+
+    df['input_seq_name'] = df.apply(replace_token_with_mask, axis=1, raw=True)
+
+    input_res = df['input_seq_name'].map(create_token_ids_by_name_fn(keyword_voc=vocab))
+    input_seq, input_seq_len = list(zip(*input_res))
+    df['input_seq'] = list(input_seq)
+    df['input_seq_len'] = list(input_seq_len)
+    df = df[df['input_seq'].map(lambda x: x is not None)]
+    print('after input_seq : {}'.format(len(df)))
+
+    target_res = df['ac_code_name'].map(create_token_ids_by_name_fn(keyword_voc=vocab))
+    target_seq, target_seq_len = list(zip(*target_res))
+    df['target_seq'] = list(target_seq)
+    df['target_seq_len'] = list(target_seq_len)
+    df = df[df['target_seq'].map(lambda x: x is not None)]
+    print('after target_seq : {}'.format(len(df)))
+
+    res = {'input_seq': df['input_seq'], 'input_seq_len': df['input_seq_len'],
+           'target_seq': df['target_seq'], 'target_seq_len': df['target_seq_len'],
+           'input_seq_name': df['input_seq_name'], 'ac_code_name': df['ac_code_name']}
+
+    return res
+
+def replace_token_with_mask(one):
+    masked_positions = set(one['masked_positions'])
+    error_tokens = ['<MASK>' if i in masked_positions else tok for i, tok in enumerate(one['ac_code_name'])]
+    return error_tokens
+
 
 if __name__ == '__main__':
     choosed_list = choose_token_random_batch([100, 20], [[True if i % 10 == 0 else False for i in range(100)], [True if i % 5 == 0 else False for i in range(20)]])

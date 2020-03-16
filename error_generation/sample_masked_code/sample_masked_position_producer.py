@@ -36,9 +36,9 @@ def sample_masked_position_main():
 
     data_df['ac_code_length'] = data_df['ac_code_name'].map(len)
     data_df['masked_positions'] = data_df['ac_code_length'].map(lambda l: random_position(l, frac=0.1))
-    data_df['masked_tokens'] = data_df.apply(lambda one: [one['ac_code_name'][pos] for pos in one['masked_positions']], axis=1)
+    data_df['masked_positions_token'] = data_df.apply(lambda one: [one['ac_code_name'][pos] for pos in one['masked_positions']], axis=1)
 
-    data_dict = {one['id']: (one['masked_positions'], one['masked_tokens']) for i, one in data_df.iterrows()}
+    data_dict = {one['id']: (one['masked_positions'], one['masked_positions_token']) for i, one in data_df.iterrows()}
     # data_dict = {i: (masked_poses, masked_toks) for i, masked_poses, masked_toks in zip(
     #              data_df['id'].tolist(), data_df['masked_positions'].tolist(), data_df['masked_tokens'].tolist())}
 

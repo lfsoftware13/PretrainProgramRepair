@@ -68,3 +68,9 @@ def convert_deepfix_to_c_code(df):
     df['code'] = df['code_with_include'].map(replace_include_with_blank)
     df = df[df['code'].map(filter_macro_fn)]
     return df
+
+
+def add_masked_position_column(df, mask_position_dict):
+    df['masked_positions'] = df['id'].map(lambda x: mask_position_dict.get(x, ([], []))[0])
+    df['masked_positions_token'] = df['id'].map(lambda x: mask_position_dict.get(x, ([], []))[1])
+    return df
