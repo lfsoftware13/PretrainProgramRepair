@@ -15,7 +15,8 @@ def get_subsequent_mask(seq):
     ''' For masking out the subsequent info. '''
     sz_b, len_s = seq.size()
     subsequent_mask = (1 - torch.triu(
-        torch.ones((1, len_s, len_s), device=seq.device), diagonal=1)).bool()
+        torch.ones((len_s, len_s), device=seq.device), diagonal=1)).byte()
+    subsequent_mask = subsequent_mask.view(1, len_s, len_s)
     return subsequent_mask
 
 
@@ -125,11 +126,18 @@ class Transformer(nn.Module):
             self, n_src_vocab, n_trg_vocab, src_pad_idx, trg_pad_idx,
             d_word_vec=512, d_model=512, d_inner=2048,
             n_layers=6, n_head=8, d_k=64, d_v=64, dropout=0.1, n_position=200,
-            trg_emb_prj_weight_sharing=True, emb_src_trg_weight_sharing=True):
+            trg_emb_prj_weight_sharing=True, emb_src_trg_weight_sharing=True,
+            bidirectional_decoder=False):
+        '''
+        :param bidirectional_decoder: default 'lm'.
+        In 'lm' type, each token be decoded can only see the tokens in front of itself.
+        In 'mlm' type, each token can see all the sequence except itself.
+        '''
 
         super().__init__()
 
         self.src_pad_idx, self.trg_pad_idx = src_pad_idx, trg_pad_idx
+        self.bidirectional_decoder = bidirectional_decoder
 
         self.encoder = Encoder(
             n_src_vocab=n_src_vocab, n_position=n_position,
@@ -165,10 +173,12 @@ class Transformer(nn.Module):
     def forward(self, src_seq, trg_seq):
 
         src_mask = get_pad_mask(src_seq, self.src_pad_idx)
-        trg_mask = get_pad_mask(trg_seq, self.trg_pad_idx) & get_subsequent_mask(trg_seq)
+        trg_mask = get_pad_mask(trg_seq, self.trg_pad_idx)
+        if not self.bidirectional_decoder:
+            trg_mask = trg_mask & get_subsequent_mask(trg_seq)
 
         enc_output, *_ = self.encoder(src_seq, src_mask)
         dec_output, *_ = self.decoder(trg_seq, trg_mask, enc_output, src_mask)
         seq_logit = self.trg_word_prj(dec_output) * self.x_logit_scale
 
-        return seq_logit.view(-1, seq_logit.size(2))
+        return seq_logit

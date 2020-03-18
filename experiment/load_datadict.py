@@ -8,7 +8,7 @@ from read_data.read_experiment_data import read_fake_common_deepfix_error_datase
 from read_data.read_train_ids import read_deepfix_masked_position
 
 
-@disk_cache(basename='load_deepfix_masked_datadict', directory=CACHE_DATA_PATH)
+# @disk_cache(basename='load_deepfix_masked_datadict', directory=CACHE_DATA_PATH)
 def load_deepfix_masked_datadict(sample_count=None):
     vocab = load_deepfix_common_error_vocabulary()
     train, valid, test = read_fake_common_deepfix_error_dataset_with_limit_length(500)

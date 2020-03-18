@@ -332,7 +332,7 @@ def group_df_to_grouped_list(data_df, groupby_key):
 
 def filter_length(df, limit_length, tokenize_fn, code_key='similar_code'):
     df['tokens'] = df[code_key].map(tokenize_fn)
-    df = df[df['tokens'].map(lambda x: len(x) < limit_length)].copy()
+    df = df[df['tokens'].map(lambda x: x is not None and len(x) < limit_length)].copy()
     df = df.drop(columns=['tokens'], axis=1)
     return df
 

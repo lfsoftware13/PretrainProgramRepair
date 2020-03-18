@@ -1,8 +1,11 @@
 from config import train_ids_path, valid_ids_path, test_ids_path, deepfix_masked_position_path
+import json
 
 
 def read_deepfix_masked_position():
-    position_dict = read_data_ids_from_file(deepfix_masked_position_path)
+    with open(deepfix_masked_position_path, mode='r') as f:
+        position_dict_str = f.readlines()[0]
+    position_dict = json.loads(position_dict_str)
     return position_dict
 
 

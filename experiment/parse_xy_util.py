@@ -1066,7 +1066,7 @@ def calculate_action_bias_from_iterative_to_static(action_list):
 
 
 # ---------------------------- parse mask position ----------------------------------- #
-def parse_masked_code(df, vocab, tokenize_fn):
+def parse_masked_code(df, vocab, tokenize_fn, ignore_id=-1):
     df['res'] = ''
 
     df['ac_code_obj'] = df['ac_code'].map(tokenize_fn)
@@ -1077,19 +1077,28 @@ def parse_masked_code(df, vocab, tokenize_fn):
 
     df['input_seq_name'] = df.apply(replace_token_with_mask, axis=1, raw=True)
 
-    input_res = df['input_seq_name'].map(create_token_ids_by_name_fn(keyword_voc=vocab))
-    input_seq, input_seq_len = list(zip(*input_res))
-    df['input_seq'] = list(input_seq)
-    df['input_seq_len'] = list(input_seq_len)
+    df['input_seq'] = df['input_seq_name'].map(create_one_token_id_by_name_fn(keyword_voc=vocab))
+    # input_seq = list(zip(*input_res))
+    # df['input_seq'] = list(input_seq)
+    df['input_seq_len'] = df['input_seq'].map(len)
     df = df[df['input_seq'].map(lambda x: x is not None)]
     print('after input_seq : {}'.format(len(df)))
 
-    target_res = df['ac_code_name'].map(create_token_ids_by_name_fn(keyword_voc=vocab))
-    target_seq, target_seq_len = list(zip(*target_res))
-    df['target_seq'] = list(target_seq)
-    df['target_seq_len'] = list(target_seq_len)
+    df['target_seq'] = df['ac_code_name'].map(create_one_token_id_by_name_fn(keyword_voc=vocab))
+    # target_seq = list(zip(*target_res))
+    # df['target_seq'] = list(target_seq)
+    df['target_seq_len'] = df['target_seq'].map(len)
     df = df[df['target_seq'].map(lambda x: x is not None)]
     print('after target_seq : {}'.format(len(df)))
+
+    def mask_notrain_position(one):
+        target_seq_original = one['target_seq']
+        target_seq = [ignore_id for _ in range(len(one['target_seq']))]
+        for p in one['masked_positions']:
+            target_seq[p] = target_seq_original[p]
+        return target_seq
+
+    df['target_seq'] = df.apply(mask_notrain_position, axis=1)
 
     res = {'input_seq': df['input_seq'], 'input_seq_len': df['input_seq_len'],
            'target_seq': df['target_seq'], 'target_seq_len': df['target_seq_len'],

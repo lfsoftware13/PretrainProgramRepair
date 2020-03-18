@@ -739,4 +739,25 @@ class SensibilityRNNEvaluator(Evaluator):
         return self.__str__()
 
 
+class MaskedLanguageModelTokenAccuracy(Evaluator):
+    def __init__(self, ignore_token=None):
+        self.accuracy_evaluator = TokenAccuracy(ignore_token=ignore_token)
 
+    def clear_result(self):
+        self.accuracy_evaluator.clear_result()
+
+    def add_result(self, output, model_output, model_target, model_input, ignore_token=None, batch_data=None):
+        target = model_target[0]
+        accuracy = self.accuracy_evaluator.add_result(output, target, ignore_token=ignore_token, batch_data=batch_data)
+        return 'accuracy: {}'.format(accuracy)
+
+    def get_result(self):
+        accuracy = self.accuracy_evaluator.get_result()
+        return accuracy
+
+    def __str__(self):
+        accuracy = self.get_result()
+        return ' MaskedLanguageModelTokenAccuracy: ' + str(accuracy)
+
+    def __repr__(self):
+        return self.__str__()
