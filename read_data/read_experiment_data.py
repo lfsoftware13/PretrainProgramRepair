@@ -71,16 +71,16 @@ def read_fake_random_c_error_dataset_with_limit_length(limit_length=500):
 
 
 @disk_cache(basename='read_fake_common_deepfix_error_dataset_with_limit_length', directory=CACHE_DATA_PATH)
-def read_fake_common_deepfix_error_dataset_with_limit_length(limit_length=500):
+def read_fake_common_deepfix_error_dataset_with_limit_length(limit_length=500, random_seed=100):
     data_df = read_fake_deepfix_common_error_records()
 
     tokenize_fn = tokenize_by_clex_fn()
     data_df = filter_length(data_df, limit_length, tokenize_fn)
     print('after filter code length: {}'.format(len(data_df)))
 
-    valid_df = data_df.sample(frac=0.05)
+    valid_df = data_df.sample(frac=0.05, random_state=random_seed)
     data_df = data_df.drop(valid_df.index)
-    test_df = data_df.sample(frac=0.05)
+    test_df = data_df.sample(frac=0.05, random_state=random_seed)
     train_df = data_df.drop(test_df.index)
 
     return train_df, valid_df, test_df

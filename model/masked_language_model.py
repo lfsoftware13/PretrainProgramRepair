@@ -85,7 +85,7 @@ def create_output_ids_fn():
 
         masked_positions = model_input[6]
         positions = [[(i, p) for p in positions] for i, positions in enumerate(masked_positions)]
-        positions = torch.LongTensor(list(more_itertools.flatten(positions)), device=input_seq.device)
+        positions = torch.LongTensor(list(more_itertools.flatten(positions))).to(input_seq.device)
 
         mask = torch.ones(input_seq.size(), device=input_seq.device).byte()
         mask[positions[:,0],positions[:,1]] = 0

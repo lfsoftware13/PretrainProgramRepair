@@ -3,7 +3,7 @@ from abc import abstractmethod, ABCMeta
 import torch
 
 from common.problem_util import to_cuda
-from common.torch_util import expand_tensor_sequence_to_same
+from common.torch_util import expand_tensor_sequence_to_same, create_sequence_length_mask
 from common.util import PaddedList
 
 import torch.nn.functional as F
@@ -758,6 +758,71 @@ class MaskedLanguageModelTokenAccuracy(Evaluator):
     def __str__(self):
         accuracy = self.get_result()
         return ' MaskedLanguageModelTokenAccuracy: ' + str(accuracy)
+
+    def __repr__(self):
+        return self.__str__()
+
+
+class MaskedLanguageModelResultSaver(Evaluator):
+    def __init__(self, vocab, ignore_token=None, file_path=None):
+        self.vocab = vocab
+        self.ignore_token = ignore_token
+        self.file_path = file_path
+        if file_path is not None:
+            with open(file_path, 'w') as f:
+                pass
+
+    def add_result(self, output_ids, model_output, model_target, model_input, ignore_token=None, batch_data=None):
+        """
+
+        :param log_probs: [batch, seq, vocab_size]
+        :param target: [batch, seq]
+        :param ignore_token:
+        :param gpu_index:
+        :param batch_data:
+        :return:
+        """
+        input_seq_len = model_input[1]
+        seq_mask = create_sequence_length_mask(input_seq_len)
+        output_ids = output_ids.tolist()
+
+        outputs = [self.convert_one_token_ids_to_code(o, self.vocab.id_to_word) for o in output_ids]
+
+
+    def save_to_file(self, input_token=None, predict_token=None, target_token=None):
+        pass
+
+    def filter_token_ids(self, token_ids, start, end, unk):
+
+        def filter_special_token(token_ids, val):
+            return list(filter(lambda x: x != val, token_ids))
+
+        try:
+            end_position = token_ids.index(end)
+            token_ids = token_ids[:end_position+1]
+        except ValueError as e:
+            end_position = None
+        # token_ids = filter_special_token(token_ids, start)
+        # token_ids = filter_special_token(token_ids, end)
+        token_ids = filter_special_token(token_ids, unk)
+        return token_ids, end_position
+
+    def convert_one_token_ids_to_code(self, token_ids, id_to_word_fn):
+        if not isinstance(token_ids, list):
+            token_ids = list(token_ids)
+        # token_ids, _ = self.filter_token_ids(token_ids, start, end, unk)
+        tokens = [id_to_word_fn(tok) for tok in token_ids]
+        code = ' '.join(tokens)
+        return code
+
+    def clear_result(self):
+        return 0.0
+
+    def get_result(self):
+        return 0.0
+
+    def __str__(self):
+        return ''
 
     def __repr__(self):
         return self.__str__()
