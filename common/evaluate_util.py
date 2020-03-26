@@ -767,13 +767,16 @@ class MaskedLanguageModelTokenAccuracy(Evaluator):
 
 
 class GraphPositionPredictAccuracy(Evaluator):
-    def __init__(self, ignore_token=None):
+    def __init__(self, ignore_token=None, train_type='both'):
         self.accuracy_evaluator = TokenAccuracy(ignore_token=ignore_token)
+        self.train_type = train_type
 
     def clear_result(self):
         self.accuracy_evaluator.clear_result()
 
     def add_result(self, output, model_output, model_target, model_input, ignore_token=None, batch_data=None):
+        if self.train_type == 'gene':
+            return ' position accuracy: {}'.format(0.0)
         position_output_logits = model_output[1][0]
         position_target = model_output[3][0]
         position_output = torch.sigmoid(position_output_logits[:, 1:1+position_target.size(1)]) > 0.5

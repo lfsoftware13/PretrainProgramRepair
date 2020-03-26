@@ -34,14 +34,14 @@ class PretrainMaskedCodeModel(nn.Module):
         self.vocabulary = vocabulary
         self.generator = MaskedLanguageModel(**mask_language_model_param)
         self.discriminator = ErrorDetectorModel(**detect_token_model_param)
-        self.train_type = train_type
         self.ignore_id = ignore_id
         self.pad_id = pad_id
         self.check_error_task = check_error_task
         from common.pycparser_util import tokenize_by_clex_fn
         self.tokenize_fn = tokenize_by_clex_fn()
 
-        self.change_model_train_type(self.train_type)
+        self.train_type = ''
+        self.change_model_train_type(train_type)
 
     def change_model_train_type(self, train_type):
         if self.train_type == train_type:
@@ -63,20 +63,25 @@ class PretrainMaskedCodeModel(nn.Module):
 
     def forward(self, inp_seq, inp_seq_len, inp_mask, target_seq, target_len, target_mask, masked_positions,
                 ac_seq, ac_seq_len):
-        if self.train_type == 'both':
+        if self.train_type == 'both' or self.train_type == 'gene' or self.train_type == 'disc':
             masked_output_logit = self.generator(inp_seq, inp_seq_len, inp_mask, target_seq, target_len, target_mask, masked_positions)
 
             masked_output_ids = self.extract_result_from_logit(masked_output_logit[0])
             output_tokens_seq = self.create_gene_output_code_seq(inp_seq, target_seq, masked_output_ids)
         elif self.train_type == 'only_disc':
-            masked_output_logit = torch.ones([1]).to(inp_seq.device)
+            masked_output_logit = [torch.ones([1]).to(inp_seq.device)]
             output_tokens_seq = inp_seq
 
-        disc_inputs, disc_is_effect = self.prepare_discriminator_input(output_tokens_seq, inp_seq_len)
-        disc_targets = self.prepare_discriminator_target(disc_inputs[1], ac_seq, ac_seq_len, self.check_error_task,
-                                                         disc_is_effect)
+        if self.train_type == 'disc' or self.train_type == 'only_disc':
+            disc_inputs, disc_is_effect = self.prepare_discriminator_input(output_tokens_seq, inp_seq_len)
+            disc_targets = self.prepare_discriminator_target(disc_inputs[1], ac_seq, ac_seq_len, self.check_error_task,
+                                                             disc_is_effect)
 
-        disc_outputs_logits = self.discriminator(*disc_inputs)
+            disc_outputs_logits = self.discriminator(*disc_inputs)
+        else:
+            disc_outputs_logits = [torch.ones([1]).to(inp_seq.device)]
+            disc_inputs = [torch.ones([1]).to(inp_seq.device)]
+            disc_targets = [torch.ones([1]).to(inp_seq.device)]
         return masked_output_logit, disc_outputs_logits, disc_inputs, disc_targets
 
     def prepare_discriminator_input(self, output_tokens_seq, inp_seq_len):
@@ -199,8 +204,8 @@ def create_loss_fn(ignore_id, check_error_task=True, train_type='both'):
     seq_loss = nn.CrossEntropyLoss(ignore_index=ignore_id)
     check_error_loss = nn.BCEWithLogitsLoss(reduction='none')
     def loss_fn(masked_output_logit, disc_outputs_logits, disc_inputs, disc_targets, masked_target_seq):
+        masked_output_logit = masked_output_logit[0]
         if train_type == 'both' or train_type == 'gene':
-            masked_output_logit = masked_output_logit[0]
             masked_loss = seq_loss(masked_output_logit.view(-1, masked_output_logit.size(2)), masked_target_seq.view(-1))
         else:
             masked_loss = torch.FloatTensor([0]).to(masked_output_logit.device)
