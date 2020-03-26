@@ -740,16 +740,19 @@ class SensibilityRNNEvaluator(Evaluator):
 
 
 class MaskedLanguageModelTokenAccuracy(Evaluator):
-    def __init__(self, ignore_token=None):
+    def __init__(self, ignore_token=None, train_type='both'):
         self.accuracy_evaluator = TokenAccuracy(ignore_token=ignore_token)
+        self.train_type = train_type
 
     def clear_result(self):
         self.accuracy_evaluator.clear_result()
 
     def add_result(self, output, model_output, model_target, model_input, ignore_token=None, batch_data=None):
+        if self.train_type == 'only_disc':
+            return ' masked accuracy: {}'.format(0.0)
         target = model_target[0]
         accuracy = self.accuracy_evaluator.add_result(output, target, ignore_token=ignore_token, batch_data=batch_data)
-        return 'accuracy: {}'.format(accuracy)
+        return ' masked accuracy: {}'.format(accuracy)
 
     def get_result(self):
         accuracy = self.accuracy_evaluator.get_result()
@@ -758,6 +761,32 @@ class MaskedLanguageModelTokenAccuracy(Evaluator):
     def __str__(self):
         accuracy = self.get_result()
         return ' MaskedLanguageModelTokenAccuracy: ' + str(accuracy)
+
+    def __repr__(self):
+        return self.__str__()
+
+
+class GraphPositionPredictAccuracy(Evaluator):
+    def __init__(self, ignore_token=None):
+        self.accuracy_evaluator = TokenAccuracy(ignore_token=ignore_token)
+
+    def clear_result(self):
+        self.accuracy_evaluator.clear_result()
+
+    def add_result(self, output, model_output, model_target, model_input, ignore_token=None, batch_data=None):
+        position_output_logits = model_output[1][0]
+        position_target = model_output[3][0]
+        position_output = torch.sigmoid(position_output_logits[:, 1:1+position_target.size(1)]) > 0.5
+        accuracy = self.accuracy_evaluator.add_result(position_output.float(), position_target, ignore_token=ignore_token, batch_data=batch_data)
+        return ' position accuracy: {}'.format(accuracy)
+
+    def get_result(self):
+        accuracy = self.accuracy_evaluator.get_result()
+        return accuracy
+
+    def __str__(self):
+        accuracy = self.get_result()
+        return ' GraphPositionPredictAccuracy: ' + str(accuracy)
 
     def __repr__(self):
         return self.__str__()

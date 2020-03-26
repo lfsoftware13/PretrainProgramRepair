@@ -428,6 +428,7 @@ def _get_dataset_item(x):
 
 def data_loader(dataset, batch_size, is_shuffle=True, drop_last=False, epoch_ratio=1.0, multi_process=False):
     idxs = list(range(len(dataset)))
+    dataset.init_epoch()
     if is_shuffle:
         idxs = shuffle(idxs)
     idxs = idxs[0: int(len(idxs)*epoch_ratio)]

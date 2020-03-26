@@ -199,9 +199,24 @@ def ast_config():
     return ast_config.config
 
 
+def create_default_graph(token_list):
+    from common.pycparser_util import tokenize_by_clex_fn
+    tokenize_fn = tokenize_by_clex_fn()
+    tokens = tokenize_fn("\n" + " ".join(token_list))
+    return CodeGraph(tokens, [(0, 1)], add_sequence_link=ast_config()['add_sequence_link'])
+
+
 def parse_ast_code_graph(token_list, ):
-    ast, tokens = ast_parse("\n"+" ".join(token_list))
-    return CodeGraph(tokens, ast, add_sequence_link=ast_config()['add_sequence_link'])
+    try:
+        ast, tokens = ast_parse("\n"+" ".join(token_list))
+    except Exception as e:
+        graph = create_default_graph(token_list)
+        return graph, False
+    graph = CodeGraph(tokens, ast, add_sequence_link=ast_config()['add_sequence_link'])
+    if graph.graph_length > 700:
+        graph = create_default_graph(token_list)
+        return graph, False
+    return graph, True
 
 
 if __name__ == '__main__':

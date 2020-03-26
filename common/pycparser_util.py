@@ -28,21 +28,21 @@ def init_pycparser(lexer=CLexer):
 
 def tokenize_by_clex_fn():
     c_parser = init_pycparser(lexer=BufferedCLex)
-    def tokenize_fn(code):
-        tokens = tokenize_by_clex(code, c_parser.clex)
+    def tokenize_fn(code, print_info=True):
+        tokens = tokenize_by_clex(code, c_parser.clex, print_info=print_info)
         return tokens
     return tokenize_fn
 
 
 tokenize_error_count = 0
 count = 0
-def tokenize_by_clex(code, lexer):
+def tokenize_by_clex(code, lexer, print_info=True):
     # print('code: ', code)
     global tokenize_error_count, count
     try:
         if '#' in code:
             return None
-        if count % 1000 == 0:
+        if count % 1000 == 0 and print_info:
             print('tokenize: {}'.format(count))
         count += 1
         lexer.reset_lineno()

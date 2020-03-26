@@ -6,7 +6,7 @@ from model.graph_encoder_model import GraphEncoder
 
 class ErrorDetectorModel(nn.Module):
     def __init__(self, hidden_size, vocab_size, graph_embedding, graph_parameter, pointer_type='query',
-                 p2_type='static', p2_step_length=0):
+                 p2_type='static', p2_step_length=0, check_error_task=True):
         super().__init__()
         self.embedding = nn.Embedding(vocab_size, hidden_size)
         self.graph_encoder = GraphEncoder(hidden_size=hidden_size,
@@ -17,12 +17,15 @@ class ErrorDetectorModel(nn.Module):
                  p2_type=p2_type,
                  p2_step_length=p2_step_length,
                  do_embedding=True)
-        self.output = nn.Linear(hidden_size, 1)
+        if check_error_task:
+            self.output = nn.Linear(hidden_size, 1)
+        else:
+            self.output = nn.Linear(hidden_size, vocab_size)
 
     def forward(self, adjacent_matrix, inp_seq, inp_seq_len):
         _, _, encoder_logit = self.graph_encoder(adjacent_matrix, inp_seq, inp_seq_len)
         output_logit = self.output(encoder_logit).squeeze(-1)
-        return output_logit
+        return [output_logit]
 
 
 def create_loss_fn(ignore_id):
