@@ -1,7 +1,10 @@
 import torch
 import torch.nn as nn
 
+from common.torch_util import create_sequence_length_mask
 from model.graph_encoder_model import GraphEncoder
+from model.transformer.Attention import ScaledDotProductAttention
+from model.transformer.transformer_sublayers import MultiHeadAttention
 
 
 class ErrorDetectorModel(nn.Module):
@@ -17,14 +20,21 @@ class ErrorDetectorModel(nn.Module):
                  p2_type=p2_type,
                  p2_step_length=p2_step_length,
                  do_embedding=True)
+        self.check_error_task = check_error_task
         if check_error_task:
             self.output = nn.Linear(hidden_size, 1)
         else:
+            self.attention = MultiHeadAttention(1, hidden_size, hidden_size, hidden_size, dropout=0.2)
             self.output = nn.Linear(hidden_size, vocab_size)
 
     def forward(self, adjacent_matrix, inp_seq, inp_seq_len):
         _, _, encoder_logit = self.graph_encoder(adjacent_matrix, inp_seq, inp_seq_len)
-        output_logit = self.output(encoder_logit).squeeze(-1)
+        if self.check_error_task:
+            output_logit = self.output(encoder_logit).squeeze(-1)
+        else:
+            mask = create_sequence_length_mask(inp_seq_len).unsqueeze(dim=-2)
+            encoder_logit, _ = self.attention(encoder_logit, encoder_logit, encoder_logit, mask)
+            output_logit = self.output(encoder_logit)
         return [output_logit]
 
 

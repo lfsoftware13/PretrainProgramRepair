@@ -23,7 +23,7 @@ def set_model_requires_grad(m, requires_grad):
 
 class PretrainMaskedCodeModel(nn.Module):
     def __init__(self, vocabulary, mask_language_model_param, detect_token_model_param, train_type, ignore_id, pad_id,
-                 check_error_task):
+                 check_error_task, only_predict_masked=False):
         '''
         :param vocabulary:
         :param mask_language_model_param:
@@ -37,6 +37,7 @@ class PretrainMaskedCodeModel(nn.Module):
         self.ignore_id = ignore_id
         self.pad_id = pad_id
         self.check_error_task = check_error_task
+        self.only_predict_masked = only_predict_masked
         from common.pycparser_util import tokenize_by_clex_fn
         self.tokenize_fn = tokenize_by_clex_fn()
 
@@ -51,7 +52,7 @@ class PretrainMaskedCodeModel(nn.Module):
         if self.train_type == 'gene':
             set_model_requires_grad(self.generator, True)
             set_model_requires_grad(self.discriminator, False)
-        elif self.train_type == 'only_disc' or self.train_type == 'disc':
+        elif self.train_type == 'only_disc' or self.train_type == 'disc' or self.train_type == 'bert':
             set_model_requires_grad(self.generator, False)
             set_model_requires_grad(self.discriminator, True)
         elif self.train_type == 'both':
@@ -68,14 +69,17 @@ class PretrainMaskedCodeModel(nn.Module):
 
             masked_output_ids = self.extract_result_from_logit(masked_output_logit[0])
             output_tokens_seq = self.create_gene_output_code_seq(inp_seq, target_seq, masked_output_ids)
-        elif self.train_type == 'only_disc':
+        elif self.train_type == 'only_disc' or self.train_type == 'bert':
             masked_output_logit = [torch.ones([1]).to(inp_seq.device)]
             output_tokens_seq = inp_seq
 
-        if self.train_type == 'disc' or self.train_type == 'only_disc':
+        if self.train_type == 'both' or self.train_type == 'bert'or self.train_type == 'disc' or self.train_type == 'only_disc':
             disc_inputs, disc_is_effect = self.prepare_discriminator_input(output_tokens_seq, inp_seq_len)
-            disc_targets = self.prepare_discriminator_target(disc_inputs[1], ac_seq, ac_seq_len, self.check_error_task,
-                                                             disc_is_effect)
+            if self.train_type == 'bert':
+                disc_targets = self.prepare_discriminator_target_masked_output(target_seq, disc_is_effect, self.ignore_id)
+            else:
+                disc_targets = self.prepare_discriminator_target(disc_inputs[1], target_seq, ac_seq, ac_seq_len, self.check_error_task,
+                                                                 disc_is_effect, self.only_predict_masked)
 
             disc_outputs_logits = self.discriminator(*disc_inputs)
         else:
@@ -83,6 +87,13 @@ class PretrainMaskedCodeModel(nn.Module):
             disc_inputs = [torch.ones([1]).to(inp_seq.device)]
             disc_targets = [torch.ones([1]).to(inp_seq.device)]
         return masked_output_logit, disc_outputs_logits, disc_inputs, disc_targets
+
+    def prepare_discriminator_target_masked_output(self, target_seq, is_effect, ignore_id):
+        is_effect_mask = torch.ByteTensor(is_effect).unsqueeze(-1).to(target_seq.device)
+        mask = target_seq.ne(-1) * is_effect_mask
+        mask = mask * target_seq.ne(0)
+        target = torch.where(mask, target_seq, torch.LongTensor([ignore_id]).to(target_seq.device))
+        return [target]
 
     def prepare_discriminator_input(self, output_tokens_seq, inp_seq_len):
         output_length_list = inp_seq_len.tolist()
@@ -93,16 +104,20 @@ class PretrainMaskedCodeModel(nn.Module):
         res = [generate_one_graph_input(one, self.vocabulary, self.tokenize_fn) for one in output_names_list]
         disc_input_names, disc_input_length, disc_adj, disc_is_effect = list(zip(*res))
 
+        if self.train_type == 'only_disc' or self.train_type == 'bert':
+            disc_input_names = [[i if i != 'mask' else '<MASK>' for i in one] for one in disc_input_names]
+
         disc_input_seq = [[self.vocabulary.word_to_id(i) for i in one] for one in disc_input_names]
 
         disc_inputs = parse_graph_input_from_mask_lm_output(disc_input_seq, disc_input_length, disc_adj)
 
         return disc_inputs, disc_is_effect
 
-    def prepare_discriminator_target(self, output_tokens_seq, ac_seq, ac_seq_len, check_error_task, is_effect):
-        gene_target_seq = parse_graph_output_from_mask_lm_output(output_tokens_seq, ac_seq, ac_seq_len,
+    def prepare_discriminator_target(self, output_tokens_seq, target_seq, ac_seq, ac_seq_len, check_error_task, is_effect, only_predict_masked):
+        gene_target_seq = parse_graph_output_from_mask_lm_output(output_tokens_seq, target_seq, ac_seq, ac_seq_len,
                                                                  ignore_id=self.ignore_id,
-                                                                 check_error_task=check_error_task, is_effect=is_effect)
+                                                                 check_error_task=check_error_task, is_effect=is_effect,
+                                                                 only_predict_masked=only_predict_masked)
         return [gene_target_seq]
 
     def extract_result_from_logit(self, seq_logit):
@@ -170,13 +185,18 @@ def parse_graph_input_from_mask_lm_output(input_seq, input_length, adj, use_ast=
     return adjacent_matrix, input_seq, input_length
 
 
-def parse_graph_output_from_mask_lm_output(input_seq, ac_seq, ac_seq_len, ignore_id=-1, check_error_task=False, is_effect=[]):
+def parse_graph_output_from_mask_lm_output(input_seq, target_seq, ac_seq, ac_seq_len, ignore_id=-1, check_error_task=False,
+                                           is_effect=[], only_predict_masked=False):
+    is_effect_mask = torch.ByteTensor(is_effect).unsqueeze(-1).to(ac_seq_len.device)
+    mask = create_sequence_length_mask(ac_seq_len)
+    mask = mask * is_effect_mask
+    if only_predict_masked:
+        mask = mask * target_seq.ne(-1)
     if check_error_task:
-        is_effect_mask = torch.ByteTensor(is_effect).unsqueeze(-1).to(ac_seq_len.device)
-        mask = create_sequence_length_mask(ac_seq_len)
-        mask = mask * is_effect_mask
         target = torch.eq(input_seq[:, 1:1+ac_seq.size(1)], ac_seq).float()
         target = torch.where(mask, target, torch.FloatTensor([ignore_id]).to(target.device))
+    else:
+        target = torch.where(mask, ac_seq, torch.LongTensor([ignore_id]).to(ac_seq.device))
     return target
 
 
@@ -210,25 +230,30 @@ def create_loss_fn(ignore_id, check_error_task=True, train_type='both'):
         else:
             masked_loss = torch.FloatTensor([0]).to(masked_output_logit.device)
 
-        if train_type == 'both' or train_type == 'disc' or train_type == 'only_disc':
+        if train_type == 'both' or train_type == 'disc' or train_type == 'only_disc' or train_type == 'bert':
             if check_error_task:
                 position_target = disc_targets[0]
                 disc_position_logits = disc_outputs_logits[0]
                 disc_position_logits = disc_position_logits[:, 1:1+position_target.size(1)]
                 mask = torch.ne(position_target, ignore_id)
                 disc_loss = check_error_loss(disc_position_logits, position_target.float()) * mask.float()
-                replaced_loss = torch.sum(disc_loss) / torch.sum(mask.float())
+                replaced_loss = 3 * (torch.sum(disc_loss) / torch.sum(mask.float()))
+            else:
+                seq_target = disc_targets[0]
+                disc_seq_logits = disc_outputs_logits[0]
+                disc_seq_logits = disc_seq_logits[:, 1:1 + seq_target.size(1)]
+                replaced_loss = seq_loss(disc_seq_logits.contiguous().view(-1, disc_seq_logits.size(2)), seq_target.view(-1))
         else:
-            replaced_loss = torch.FloatTensor([0]).to(masked_output_logit.device)
+            replaced_loss = 3 * torch.FloatTensor([0]).to(masked_output_logit.device)
 
-        combine_loss = masked_loss + 3 * replaced_loss
+        combine_loss = masked_loss + replaced_loss
         return combine_loss
     return loss_fn
 
 
 def create_output_ids_fn(train_type='both'):
     def create_output(model_output, model_input, do_sample):
-        if train_type == 'only_disc':
+        if train_type == 'only_disc' or train_type == 'bert':
             return model_input[0]
 
         input_seq = model_input[0]

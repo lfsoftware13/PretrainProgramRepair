@@ -182,3 +182,16 @@ class Transformer(nn.Module):
         seq_logit = self.trg_word_prj(dec_output) * self.x_logit_scale
 
         return seq_logit
+
+
+if __name__ == '__main__':
+    from thop import profile
+    from thop import clever_format
+
+    model = Transformer(n_src_vocab=5000, n_trg_vocab=5000, src_pad_idx=0, trg_pad_idx=0, d_word_vec=512, d_model=512,
+                        d_inner=2048, n_layers=6, n_head=8, d_k=64, d_v=64, dropout=0.1, n_position=200,
+                        trg_emb_prj_weight_sharing=True, emb_src_trg_weight_sharing=True, bidirectional_decoder=False)
+    inp = torch.ones([1, 200]).long()
+    macs, params = profile(model, inputs=[inp, inp])
+    macs, params = clever_format([macs, params], "%.3f")
+    print(macs, params)

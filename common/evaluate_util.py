@@ -748,7 +748,7 @@ class MaskedLanguageModelTokenAccuracy(Evaluator):
         self.accuracy_evaluator.clear_result()
 
     def add_result(self, output, model_output, model_target, model_input, ignore_token=None, batch_data=None):
-        if self.train_type == 'only_disc':
+        if self.train_type == 'only_disc' or self.train_type == 'bert':
             return ' masked accuracy: {}'.format(0.0)
         target = model_target[0]
         accuracy = self.accuracy_evaluator.add_result(output, target, ignore_token=ignore_token, batch_data=batch_data)
@@ -767,9 +767,10 @@ class MaskedLanguageModelTokenAccuracy(Evaluator):
 
 
 class GraphPositionPredictAccuracy(Evaluator):
-    def __init__(self, ignore_token=None, train_type='both'):
+    def __init__(self, ignore_token=None, train_type='both', check_error_task=True):
         self.accuracy_evaluator = TokenAccuracy(ignore_token=ignore_token)
         self.train_type = train_type
+        self.check_error_task = check_error_task
 
     def clear_result(self):
         self.accuracy_evaluator.clear_result()
@@ -777,10 +778,14 @@ class GraphPositionPredictAccuracy(Evaluator):
     def add_result(self, output, model_output, model_target, model_input, ignore_token=None, batch_data=None):
         if self.train_type == 'gene':
             return ' position accuracy: {}'.format(0.0)
-        position_output_logits = model_output[1][0]
         position_target = model_output[3][0]
-        position_output = torch.sigmoid(position_output_logits[:, 1:1+position_target.size(1)]) > 0.5
-        accuracy = self.accuracy_evaluator.add_result(position_output.float(), position_target, ignore_token=ignore_token, batch_data=batch_data)
+        position_output_logits = model_output[1][0]
+        position_output_logits = position_output_logits[:, 1:1 + position_target.size(1)]
+        if self.train_type == 'bert' or not self.check_error_task:
+            position_output = torch.squeeze(torch.topk(F.softmax(position_output_logits, dim=-1), dim=-1, k=1)[1], dim=-1)
+        else:
+            position_output = (torch.sigmoid(position_output_logits) > 0.5).float()
+        accuracy = self.accuracy_evaluator.add_result(position_output, position_target, ignore_token=ignore_token, batch_data=batch_data)
         return ' position accuracy: {}'.format(accuracy)
 
     def get_result(self):

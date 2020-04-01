@@ -44,25 +44,54 @@ class MaskedDataset(CustomerDataSet):
         if self.random_mask_position:
             for row in self._samples:
                 row['masked_positions'] = random_position(row['ac_seq_len'], frac=self.mask_frac)
-                self.replace_token_with_mask(row)
+
         if self.train_type == 'only_disc':
             for row in self._samples:
                 self.replace_half_token_with_the_other(row)
+        elif self.train_type == 'bert':
+            for row in self._samples:
+                self.replace_token_with_mask_bert(row, mask_name='mask')
+        else:
+            for row in self._samples:
+                self.replace_token_with_mask(row)
+
         return
 
-    def replace_token_with_mask(self, row):
+    def replace_token_with_mask(self, row, mask_name='<MASK>'):
         row['input_seq'] = row['ac_seq'].copy()
         row['input_seq_name'] = row['ac_code_name'].copy()
         row['target_seq'] = [-1 for _ in range(len(row['input_seq']))]
         for p in row['masked_positions']:
             row['input_seq'][p] = self.masked_id
-            row['input_seq_name'][p] = '<MASK>'
+            row['input_seq_name'][p] = mask_name
+            row['target_seq'][p] = row['ac_seq'][p]
+        return row
+
+    def replace_token_with_mask_bert(self, row, mask_name='<MASK>', copy_frac=0.1, stay_frac=0.1):
+        row['input_seq'] = row['ac_seq'].copy()
+        row['input_seq_name'] = row['ac_code_name'].copy()
+        row['target_seq'] = [-1 for _ in range(len(row['input_seq']))]
+
+        mask_position, copy_position, stay_position = self.random_copy_and_stay_position(row['masked_positions'])
+
+        for p in mask_position:
+            row['input_seq'][p] = self.masked_id
+            row['input_seq_name'][p] = mask_name
+            row['target_seq'][p] = row['ac_seq'][p]
+        copy_position = shuffle(list(copy_position))
+        copy_replaced_p = set(random_position(row['ac_seq_len'], num=len(copy_position)))
+        for p, p_t in zip(copy_position, copy_replaced_p):
+            row['input_seq'][p] = row['ac_seq'][p_t]
+            row['input_seq_name'][p] = row['ac_code_name'][p_t]
+            row['target_seq'][p] = row['ac_seq'][p]
+        for p in stay_position:
             row['target_seq'][p] = row['ac_seq'][p]
         return row
 
     def replace_half_token_with_the_other(self, row):
         positions = shuffle(row['masked_positions'])
         half_len = int(len(positions) / 2)
+        row['target_seq'] = [-1 for _ in range(len(row['input_seq']))]
         for i, p in enumerate(positions[:half_len]):
             copy_p = positions[i + half_len]
             row['input_seq'][p] = row['ac_seq'][copy_p]
@@ -73,6 +102,15 @@ class MaskedDataset(CustomerDataSet):
             row['input_seq_name'][p] = row['ac_code_name'][p]
             row['target_seq'][p] = row['ac_seq'][p]
         return row
+
+    def random_copy_and_stay_position(self, all_position, copy_frac=0.1, stay_frac=0.1):
+        all_position = set(all_position)
+        position_num = len(all_position)
+        copy_position = set(random.sample(all_position, int(position_num * copy_frac)))
+        retain_position = all_position - copy_position
+        stay_position = set(random.sample(retain_position, int(position_num * stay_frac)))
+        mask_position = retain_position - stay_position
+        return mask_position, copy_position, stay_position
 
     def _get_raw_sample(self, row):
         sample = {}
