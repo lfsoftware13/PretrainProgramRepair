@@ -20,7 +20,7 @@ def create_extract_loss_re(rule, info_num):
     return extract_loss_re
 
 
-def read_file_each_line(file_path, extract_fn_list):
+def extract_info_from_file_each_line(file_path, extract_fn_list):
     result = [[] for _ in range(len(extract_fn_list))]
     for line in open(file_path, 'r'):
         for i in range(len(extract_fn_list)):
@@ -53,7 +53,7 @@ if __name__ == '__main__':
     extract_program_fix_fn = create_extract_loss_re(program_fix_rule, info_num=4)
     # re_rule_test(extract_program_fix_fn, line4)
     # file_path = r'/home/lf/Project/PretrainProgramRepair/log/pretrain_masked_model1.log'
-    file_path = r'/home/lf/Project/ProgramFix/pretrain_log/pretrain_encoder_sample_config1_pretrain41.log'
-    res = read_file_each_line(file_path, [extract_loss_fn, extract_program_fix_fn])
+    file_path = r'./pretrain_log/pretrain_encoder_sample_config7_pretrain45.log'
+    res = extract_info_from_file_each_line(file_path, [extract_loss_fn, extract_program_fix_fn])
     print(res)
 

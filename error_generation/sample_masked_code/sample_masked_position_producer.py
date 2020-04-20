@@ -35,7 +35,7 @@ def sample_masked_position_main():
     data_df = tokenize_ac_code(data_df, tokenize_fn)
 
     data_df['ac_code_length'] = data_df['ac_code_name'].map(len)
-    data_df['masked_positions'] = data_df['ac_code_length'].map(lambda l: random_position(l, frac=0.1))
+    data_df['masked_positions'] = data_df['ac_code_length'].map(lambda l: random_position(l, frac=0.4))
     data_df['masked_positions_token'] = data_df.apply(lambda one: [one['ac_code_name'][pos] for pos in one['masked_positions']], axis=1)
 
     data_dict = {one['id']: (one['masked_positions'], one['masked_positions_token']) for i, one in data_df.iterrows()}

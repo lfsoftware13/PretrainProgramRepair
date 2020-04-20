@@ -89,7 +89,7 @@ class MaskedDataset(CustomerDataSet):
         return row
 
     def replace_half_token_with_the_other(self, row):
-        positions = shuffle(row['masked_positions'])
+        positions = row['masked_positions']
         half_len = int(len(positions) / 2)
         row['target_seq'] = [-1 for _ in range(len(row['input_seq']))]
         for i, p in enumerate(positions[:half_len]):

@@ -32,6 +32,25 @@ def get_model(model_fn, model_params, path, load_previous=False, parallel=False,
         m = nn.DataParallel(m.cuda(), device_ids=[gpu_index])
     else:
         m = nn.DataParallel(m.cuda(), device_ids=[0])
+
+    load_config_3_model = False
+    if load_config_3_model:
+        model_params['check_error_task'] = True
+        model_params['detect_token_model_param']['check_error_task'] = True
+        pre_m = model_fn(**model_params)
+        pre_m = nn.DataParallel(pre_m.cuda(), device_ids=[gpu_index])
+        torch_util.load_model(pre_m, path)
+
+        m_state_dict = m.state_dict()
+        pre_state_dict = pre_m.state_dict()
+        pre_state_dict.pop('module.discriminator.output.weight')
+        pre_state_dict.pop('module.discriminator.output.bias')
+        pre_state_dict = {k: v for k, v in pre_state_dict.items() if k in m_state_dict}
+        m_state_dict.update(pre_state_dict)
+        m.load_state_dict(m_state_dict)
+        model_params['check_error_task'] = False
+        model_params['detect_token_model_param']['check_error_task'] = False
+
     if load_previous:
         # torch_util.load_model(m, path, map_location={'cuda:1': 'cuda:0'})
         torch_util.load_model(m, path)
@@ -406,16 +425,16 @@ def train_and_evaluate(model, batch_size, train_dataset, valid_dataset, test_dat
     if load_previous or just_evaluate:
         # valid_loss, valid_accuracy, valid_correct = evaluate(model=model, dataset=valid_dataset, batch_size=batch_size,
         #                                       loss_function=loss_fn, vocab=vocabulary, add_value_mask=add_value_mask)
-        # test_evaluator, test_loss = evaluate(model=model, dataset=test_dataset, batch_size=batch_size,
-        #                                      loss_function=train_loss_fn, do_sample=False,
-        #                                      parse_input_batch_data_fn=parse_input_batch_data_fn,
-        #                                      parse_target_batch_data_fn=parse_target_batch_data_fn,
-        #                                      create_output_ids_fn=create_output_ids_fn,
-        #                                      evaluate_obj_list=evaluate_obj_list,
-        #                                      expand_output_and_target_fn=expand_output_and_target_fn)
-        # print('previous test loss: {}, evaluator : '.format(test_loss))
-        # for evaluator in test_evaluator:
-        #     print(evaluator)
+        test_evaluator, test_loss = evaluate(model=model, dataset=test_dataset, batch_size=batch_size,
+                                             loss_function=train_loss_fn, do_sample=False,
+                                             parse_input_batch_data_fn=parse_input_batch_data_fn,
+                                             parse_target_batch_data_fn=parse_target_batch_data_fn,
+                                             create_output_ids_fn=create_output_ids_fn,
+                                             evaluate_obj_list=evaluate_obj_list,
+                                             expand_output_and_target_fn=expand_output_and_target_fn)
+        print('previous test loss: {}, evaluator : '.format(test_loss))
+        for evaluator in test_evaluator:
+            print(evaluator)
 
         if do_sample_and_save:
             sample_and_save_evalutor = sample_and_save(model=model, dataset=test_dataset, batch_size=batch_size,
@@ -489,17 +508,17 @@ def train_and_evaluate(model, batch_size, train_dataset, valid_dataset, test_dat
             for evaluator in sample_test_evalutor:
                 print(evaluator)
                 info(evaluator)
-        evaluate_output = 'evaluate: valid loss of {}, test loss of {}, ' \
-                          'valid_accuracy result of {}, test_accuracy result of {}, ' \
-                          'valid correct result of {}, test correct result of {}, ' \
-                          'sample valid loss: {}, sample test loss: {}, ' \
-                          'sample valid accuracy: {}, sample test accuracy: {}, ' \
-                          'sample valid correct: {}, sample test correct: {}'.format(
-            valid_loss, test_loss, valid_accuracy, test_accuracy, valid_correct, test_correct,
-            sample_valid_loss, sample_test_loss, sample_valid_accuracy, sample_test_accuracy, sample_valid_correct, sample_test_correct)
-        print(evaluate_output)
-        info(evaluate_output)
-        pass
+        # evaluate_output = 'evaluate: valid loss of {}, test loss of {}, ' \
+        #                   'valid_accuracy result of {}, test_accuracy result of {}, ' \
+        #                   'valid correct result of {}, test correct result of {}, ' \
+        #                   'sample valid loss: {}, sample test loss: {}, ' \
+        #                   'sample valid accuracy: {}, sample test accuracy: {}, ' \
+        #                   'sample valid correct: {}, sample test correct: {}'.format(
+        #     valid_loss, test_loss, valid_accuracy, test_accuracy, valid_correct, test_correct,
+        #     sample_valid_loss, sample_test_loss, sample_valid_accuracy, sample_test_accuracy, sample_valid_correct, sample_test_correct)
+        # print(evaluate_output)
+        # info(evaluate_output)
+        return
     combine_train_set = train_dataset
     for epoch in range(start_epoch, start_epoch+epoches):
         print('----------------------- in epoch {} --------------------'.format(epoch))

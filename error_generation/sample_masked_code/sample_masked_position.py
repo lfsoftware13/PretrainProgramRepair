@@ -14,7 +14,7 @@ def random_position(seq_length:int, num:int=0, frac:float=0):
         return []
     if num == 0:
         num = min(int(seq_length * frac), seq_length)
-    return list(sorted(random.sample([i for i in range(seq_length)], num)))
+    return list(random.sample([i for i in range(seq_length)], num))
 
 
 if __name__ == '__main__':
